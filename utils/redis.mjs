@@ -9,7 +9,11 @@ export class RedisClient {
     this.client.connect();
   }
   isAlive() {
-    return this.client.isOpen;
+    if (this.client.isOpen) {
+      return true;
+    } else {
+      return false;
+    }
   }
 
   async get(key) {
