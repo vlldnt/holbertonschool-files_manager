@@ -20,8 +20,8 @@ class DBClient {
         this.db = this.client.db(database);
       })
       .catch((error) => {
-        console.error('MongoDB connection error:', error);
         this.connected = false;
+        console.error('MongoDB connection error:', error);
       });
   }
 
