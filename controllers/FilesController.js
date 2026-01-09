@@ -147,27 +147,23 @@ class FilesController {
     const parentId = req.query.parentId || '0';
     const page = parseInt(req.query.page, 10) || 0;
     const pageSize = 20;
+    const query = { userId: new ObjectId(userId) };
 
-    let matchParentId;
     if (parentId === '0') {
-      matchParentId = 0;
+      query.parentId = 0;
     } else {
       try {
-        matchParentId = new ObjectId(parentId);
+        query.parentId = new ObjectId(parentId);
       } catch (error) {
         return res.status(200).json([]);
       }
     }
 
-    const aggregationPipeline = [
-      { $match: { userId: new ObjectId(userId), parentId: matchParentId } },
-      { $skip: page * pageSize },
-      { $limit: pageSize },
-    ];
-
     const files = await dbClient.db
       .collection('files')
-      .aggregate(aggregationPipeline)
+      .find(query)
+      .skip(page * pageSize)
+      .limit(pageSize)
       .toArray();
 
     const filesList = files.map((file) => ({
