@@ -134,7 +134,7 @@ class FilesController {
   }
 
   static async getIndex(req, res) {
-    const token = req.headers['x-token'];
+    const token = req.header('X-Token');
     if (!token) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -145,29 +145,21 @@ class FilesController {
     }
 
     const parentId = req.query.parentId || '0';
-    const page = parseInt(req.query.page, 10) || 0;
-    const pageSize = 20;
+    const page = Number(req.query.page) || 0;
+    const limit = 20;
 
-    let matchParentId;
-    if (parentId === '0') {
-      matchParentId = 0;
-    } else {
-      try {
-        matchParentId = new ObjectId(parentId);
-      } catch (error) {
-        return res.status(200).json([]);
-      }
-    }
-
-    const aggregationPipeline = [
-      { $match: { userId: new ObjectId(userId), parentId: matchParentId } },
-      { $skip: page * pageSize },
-      { $limit: pageSize },
-    ];
+    const match = {
+      userId: new ObjectId(userId),
+      parentId: parentId === '0' ? 0 : new ObjectId(parentId),
+    };
 
     const files = await dbClient.db
       .collection('files')
-      .aggregate(aggregationPipeline)
+      .aggregate([
+        { $match: match },
+        { $skip: page * limit },
+        { $limit: limit },
+      ])
       .toArray();
 
     const filesList = files.map((file) => ({
