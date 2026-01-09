@@ -156,11 +156,9 @@ class FilesController {
 
     const files = await dbClient.db
       .collection('files')
-      .aggregate([
-        { $match: query },
-        { $skip: page * pageSize },
-        { $limit: pageSize },
-      ])
+      .find(query)
+      .skip(page * pageSize)
+      .limit(pageSize)
       .toArray();
 
     const filesList = files.map((file) => ({
