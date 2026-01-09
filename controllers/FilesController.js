@@ -159,27 +159,27 @@ class FilesController {
       }
     }
 
-    try {
-      const files = await dbClient.db
-        .collection('files')
-        .find({ userId: new ObjectId(userId), parentId: matchParentId })
-        .skip(page * pageSize)
-        .limit(pageSize)
-        .toArray();
+    const aggregationPipeline = [
+      { $match: { userId: new ObjectId(userId), parentId: matchParentId } },
+      { $skip: page * pageSize },
+      { $limit: pageSize },
+    ];
 
-      const filesList = files.map((file) => ({
-        id: file._id,
-        userId: file.userId,
-        name: file.name,
-        type: file.type,
-        isPublic: file.isPublic,
-        parentId: file.parentId,
-      }));
+    const files = await dbClient.db
+      .collection('files')
+      .aggregate(aggregationPipeline)
+      .toArray();
 
-      return res.status(200).json(filesList);
-    } catch (error) {
-      return res.status(200).json([]);
-    }
+    const filesList = files.map((file) => ({
+      id: file._id,
+      userId: file.userId,
+      name: file.name,
+      type: file.type,
+      isPublic: file.isPublic,
+      parentId: file.parentId,
+    }));
+
+    return res.status(200).json(filesList);
   }
 }
 
