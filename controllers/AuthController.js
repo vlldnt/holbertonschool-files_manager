@@ -32,7 +32,7 @@ class AuthController {
     await redisClient.set(
       `auth_${token}`,
       existingUser._id.toString(),
-      24 * 3600
+      24 * 3600,
     );
     return res.status(200).json({ token });
   }
