@@ -144,14 +144,15 @@ class FilesController {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const parentId = req.query.parentId || '0';
     const page = Number(req.query.page) || 0;
     const limit = 20;
 
-    const match = {
-      userId: new ObjectId(userId),
-      parentId: parentId === '0' ? 0 : new ObjectId(parentId),
-    };
+    const match = { userId: new ObjectId(userId) };
+
+    if (req.query.parentId !== undefined) {
+      const { parentId } = req.query;
+      match.parentId = parentId === '0' ? 0 : new ObjectId(parentId);
+    }
 
     const files = await dbClient.db
       .collection('files')
