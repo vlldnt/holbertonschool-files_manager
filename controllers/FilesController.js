@@ -25,7 +25,6 @@ class FilesController {
       parentId = 0,
       isPublic = false,
       data,
-
     } = req.body || {};
 
     if (!name) {
@@ -135,72 +134,44 @@ class FilesController {
   }
 
   static async getIndex(req, res) {
-    const token = req.headers['x-token'];
-    const userId = await redisClient.get(`auth_${token}`);
+    const token = req.header('X-Token');
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
+    const userId = await redisClient.get(`auth_${token}`);
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    let parentIdQuery;
+    const parentId = req.query.parentId || '0';
+    const page = Number(req.query.page) || 0;
+    const limit = 20;
 
-    if (req.query.parentId === undefined) {
-      parentIdQuery = '0';
-    } else {
-      parentIdQuery = req.query.parentId;
-    }
-
-    let filterParentId;
-    if (parentIdQuery === '0') {
-      filterParentId = '0';
-    } else {
-      filterParentId = new ObjectId(parentIdQuery);
-    }
-
-    let page;
-
-    if (!req.query.page) {
-      page = 0;
-    } else {
-      page = parseInt(req.query.page, 10);
-
-      if (Number.isNaN(page) || page < 0) {
-        page = 0;
-      }
-    }
+    const match = {
+      userId: new ObjectId(userId),
+      parentId: parentId === '0' ? 0 : new ObjectId(parentId),
+    };
 
     const files = await dbClient.db
       .collection('files')
-      .find({
-        userId: new ObjectId(userId),
-        parentId: filterParentId,
-      })
-      .skip(page * 20)
-      .limit(20)
+      .aggregate([
+        { $match: match },
+        { $skip: page * limit },
+        { $limit: limit },
+      ])
       .toArray();
 
-    const result = [];
+    const filesList = files.map((file) => ({
+      id: file._id,
+      userId: file.userId,
+      name: file.name,
+      type: file.type,
+      isPublic: file.isPublic,
+      parentId: file.parentId,
+    }));
 
-    for (const file of files) {
-      let resPid;
-
-      if (file.parentId === '0') {
-        resPid = 0;
-      } else {
-        resPid = file.parentId.toString();
-      }
-
-      result.push({
-        id: file._id.toString(),
-        userId: file.userId.toString(),
-        name: file.name,
-        type: file.type,
-        isPublic: file.isPublic,
-        parentId: resPid,
-      });
-    }
-
-    return res.status(200).json(result);
+    return res.status(200).json(filesList);
   }
 }
 
