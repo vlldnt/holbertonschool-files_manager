@@ -19,13 +19,7 @@ class FilesController {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const {
-      name,
-      type,
-      parentId = 0,
-      isPublic = false,
-      data,
-    } = req.body || {};
+    const { name, type, parentId = 0, isPublic = false, data } = req.body || {};
 
     if (!name) {
       return res.status(400).json({ error: 'Missing name' });
@@ -173,6 +167,76 @@ class FilesController {
     }));
 
     return res.status(200).json(filesList);
+  }
+
+  static async putPublish(req, res) {
+    const token = req.headers['x-token'];
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const userId = await redisClient.get(`auth_${token}`);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const fileId = req.params.id;
+    const result = await dbClient.db
+      .collection('files')
+      .findOneAndUpdate(
+        { _id: new ObjectId(fileId), userId: new ObjectId(userId) },
+        { $set: { isPublic: true } },
+        { returnDocument: 'after' },
+      );
+
+    if (!result.value) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    const file = result.value;
+    return res.status(200).json({
+      id: file._id,
+      userId: file.userId,
+      name: file.name,
+      type: file.type,
+      isPublic: file.isPublic,
+      parentId: file.parentId,
+    });
+  }
+
+  static async putUnpublish(req, res) {
+    const token = req.headers['x-token'];
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const userId = await redisClient.get(`auth_${token}`);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const fileId = req.params.id;
+    const result = await dbClient.db
+      .collection('files')
+      .findOneAndUpdate(
+        { _id: new ObjectId(fileId), userId: new ObjectId(userId) },
+        { $set: { isPublic: false } },
+        { returnDocument: 'after' },
+      );
+
+    if (!result.value) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    const file = result.value;
+    return res.status(200).json({
+      id: file._id,
+      userId: file.userId,
+      name: file.name,
+      type: file.type,
+      isPublic: file.isPublic,
+      parentId: file.parentId,
+    });
   }
 }
 
