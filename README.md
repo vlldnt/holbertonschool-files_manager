@@ -27,6 +27,7 @@ Bull Queue          → Asynchronous thumbnail processing
 - MongoDB (v4+)
 - Redis (v5+)
 - npm
+- jq (for JSON formatting in tests)
 - Python 3 (for image_upload.py script)
 
 ## Installation
@@ -47,8 +48,8 @@ npm install
 ### 3. Install required system tools
 
 ```bash
-# For the 'file' command (file identification)
-apt-get update && apt-get install -y file
+# For the 'file' command (file identification) and jq (JSON formatting)
+apt-get update && apt-get install -y file jq
 ```
 
 ### 4. Setup Python virtual environment (for image_upload.py script)
@@ -126,231 +127,151 @@ In another terminal:
 npm run start-worker
 ```
 
-## Complete Testing Guide
+## Individual cURL Tests
 
-### Step 2: Connect and save token (direct)
+Tests individuels - chaque commande capture automatiquement les variables (TOKEN, IDs):
 
-Le testeur reçoit déjà l'en-tête Basic. Récupérez le token directement avec cette commande :
-
+### 1. GET /status
 ```bash
-# Récupère et exporte le token directement (header fourni)
-export TOKEN=$(curl -s -X GET http://0.0.0.0:5000/connect \
-  -H "Authorization: Basic Ym9iQGR5bGFuLmNvbTp0b3RvMTIzNCE=" | jq -r '.token')
+curl -sS http://0.0.0.0:5000/status  | jq
+```
+***Should be:*** `{"redis":true,"db":true}`
 
-echo "Your token: $TOKEN"
+### 2. GET /stats
+```bash
+curl -sS http://0.0.0.0:5000/stats | jq
 ```
 
-### Step 3: Create a folder (automatique)
-
+### 3. POST /users (crée un utilisateur)
 ```bash
-export FOLDER_ID=$(curl -s -X POST http://0.0.0.0:5000/files \
+EMAIL="sylvain@durif.com"
+PASSWORD="Le.Christ.Cosmique"
+
+curl -sS -X POST 0.0.0.0:5000/users \
+  -H "Content-Type: application/json" \
+  -d "{ \"email\": \"$EMAIL\", \"password\": \"$PASSWORD\" }" | jq
+```
+
+### 4. GET /connect (capture automatiquement le TOKEN)
+```bash
+export TOKEN=$(curl -sS http://0.0.0.0:5000/connect -H "Authorization: Basic $(echo -n "$EMAIL:$PASSWORD" | base64)" | jq -r '.token') && echo $TOKEN
+```
+
+### 5. GET /users/me
+```bash
+curl -sS http://0.0.0.0:5000/users/me -H "X-Token: $TOKEN" | jq
+```
+
+### 6. POST /files (créer un dossier, capture FOLDER_ID)
+```bash
+export FOLDER_ID=$(curl -sS -X POST http://0.0.0.0:5000/files \
   -H "X-Token: $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name":"my_photos","type":"folder"}' | jq -r '.id')
-
-echo "FOLDER_ID=$FOLDER_ID"
+  -d '{"name":"my_folder","type":"folder"}' \
+  | jq -r '.id')
+echo "FOLDER_ID: $FOLDER_ID"
 ```
 
-### Step 4: Upload an image (automatique)
-
-Option A: With Python script (prints response; capture ID)
+### 7. POST /files (upload fichier texte, capture FILE_ID)
 ```bash
-# Activate venv first
-source venv/bin/activate
-
-# Create a test image (1x1 PNG)
-echo 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==' | base64 -d > test_image.png
-
-# Upload and capture IMAGE_ID
-IMAGE_RESPONSE=$(python3 image_upload.py test_image.png "$TOKEN" "$FOLDER_ID")
-export IMAGE_ID=$(echo "$IMAGE_RESPONSE" | jq -r '.id')
-echo "IMAGE_ID=$IMAGE_ID"
-```
-
-Option B: With curl (automatique)
-```bash
-# Create a test image
-echo 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==' | base64 -d > test_image.png
-
-# Encode and upload, puis enregistrer l'ID
-IMAGE_DATA=$(base64 -w 0 test_image.png)
-export IMAGE_ID=$(curl -s -X POST http://0.0.0.0:5000/files \
+export FILE_ID=$(curl -sS -X POST http://0.0.0.0:5000/files \
   -H "X-Token: $TOKEN" \
   -H "Content-Type: application/json" \
-  -d "{\"name\":\"my_photo.png\",\"type\":\"image\",\"isPublic\":true,\"data\":\"$IMAGE_DATA\",\"parentId\":\"$FOLDER_ID\"}" | jq -r '.id')
-
-echo "IMAGE_ID=$IMAGE_ID"
+  -d "{\"name\":\"test.txt\",\"type\":\"file\",\"data\":\"SGVsbG8gV29ybGQh\",\"parentId\":\"$FOLDER_ID\"}" \
+  | jq -r '.id')
+echo "FILE_ID: $FILE_ID"
 ```
 
-### Step 5: Wait for thumbnail generation
+### 8. POST /files (upload image, capture IMAGE_ID)
+```bash
+export IMAGE_ID=$(curl -sS -X POST http://0.0.0.0:5000/files \
+  -H "X-Token: $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"image.png","type":"image","isPublic":true,"data":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="}' \
+  | jq -r '.id')
+echo "IMAGE_ID: $IMAGE_ID"
+```
+
+### 9. GET /files/:id
+```bash
+curl http://0.0.0.0:5000/files/$FILE_ID -H "X-Token: $TOKEN"
+```
+
+### 10. GET /files (pagination)
+```bash
+curl "http://0.0.0.0:5000/files?parentId=0&page=0" -H "X-Token: $TOKEN"
+```
+
+### 11. PUT /files/:id/publish
+```bash
+curl -X PUT http://0.0.0.0:5000/files/$FILE_ID/publish -H "X-Token: $TOKEN"
+```
+
+### 12. PUT /files/:id/unpublish
+```bash
+curl -X PUT http://0.0.0.0:5000/files/$FILE_ID/unpublish -H "X-Token: $TOKEN"
+```
+
+### 13. GET /files/:id/data (fichier original)
+```bash
+curl http://0.0.0.0:5000/files/$FILE_ID/data
+```
+
+### 14. GET /files/:id/data (thumbnails pour image)
+```bash
+curl "http://0.0.0.0:5000/files/$IMAGE_ID/data?size=100" -o thumb_100.png
+curl "http://0.0.0.0:5000/files/$IMAGE_ID/data?size=250" -o thumb_250.png
+curl "http://0.0.0.0:5000/files/$IMAGE_ID/data?size=500" -o thumb_500.png
+```
+
+### 15. GET /disconnect
+```bash
+curl http://0.0.0.0:5000/disconnect -H "X-Token: $TOKEN"
+```
+
+### Workflow complet d'exemple
 
 ```bash
-# Wait 5-10 seconds for the worker to generate thumbnails
-sleep 5
+# 1. Vérifier le status
+curl -sS http://0.0.0.0:5000/status | jq
 
-# Verify thumbnails are created
-ls -lh /tmp/files_manager/ | tail -5
-```
+# 2. Créer un utilisateur
+curl -sS -X POST http://0.0.0.0:5000/users -H "Content-Type: application/json" -d '{"email":"testeur@test.com","password":"123456mdp!"}' | jq
 
-You should see 4 files:
-```
--rw-r--r-- 1 root root  70 Jan 13 13:06 UUID
--rw-r--r-- 1 root root 105 Jan 13 13:06 UUID_500
--rw-r--r-- 1 root root 101 Jan 13 13:06 UUID_250
--rw-r--r-- 1 root root  98 Jan 13 13:06 UUID_100
-```
+# 3. Se connecter et récupérer le token
+TOKEN=$(curl -sS -X GET http://0.0.0.0:5000/connect -H "Authorization: Basic $(echo -n 'testeur@test.com:123456mdp!' | base64)" | jq -r '.token') && echo "Token: $TOKEN"
 
-## Other operations
+# 4. Vérifier l'utilisateur connecté
+curl -sS http://0.0.0.0:5000/users/me -H "X-Token: $TOKEN" | jq
 
-Examples below use $TOKEN, $FOLDER_ID, $IMAGE_ID (pas besoin de copier/coller) :
+# 5. Créer un dossier
+FOLDER_ID=$(curl -X POST http://0.0.0.0:5000/files \
+  -H "X-Token: $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"MyFolder","type":"folder"}' \
+  | jq -r '.id')
+echo "Folder ID: $FOLDER_ID"
 
-```bash
-# List files
-curl -X GET http://0.0.0.0:5000/files -H "X-Token: $TOKEN"
+# 6. Upload un fichier dans le dossier
+FILE_ID=$(curl -X POST http://0.0.0.0:5000/files \
+  -H "X-Token: $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"name\":\"test.txt\",\"type\":\"file\",\"data\":\"$(echo -n 'Hello World!' | base64)\",\"parentId\":\"$FOLDER_ID\"}" \
+  | jq -r '.id')
+echo "File ID: $FILE_ID"
 
-# Download original
-curl -XGET http://0.0.0.0:5000/files/$IMAGE_ID/data -o original.png
-```
+# 7. Lister les fichiers
+curl "http://0.0.0.0:5000/files?parentId=$FOLDER_ID" -H "X-Token: $TOKEN"
 
-**Expected result:**
-```
-original.png:      PNG image data, 1 x 1, 8-bit/color RGBA, non-interlaced
-thumbnail_100.png: PNG image data, 100 x 1, 8-bit/color RGB, non-interlaced
-thumbnail_250.png: PNG image data, 250 x 1, 8-bit/color RGB, non-interlaced
-thumbnail_500.png: PNG image data, 500 x 1, 8-bit/color RGB, non-interlaced
-```
+# 8. Publier le fichier
+curl -X PUT "http://0.0.0.0:5000/files/$FILE_ID/publish" -H "X-Token: $TOKEN"
 
-### Step 7: Other operations
+# 9. Récupérer le contenu
+curl "http://0.0.0.0:5000/files/$FILE_ID/data"
 
-```bash
-# List all your files
-curl -X GET http://0.0.0.0:5000/files -H "X-Token: $TOKEN"
-
-# View a specific file
-curl -X GET http://0.0.0.0:5000/files/$IMAGE_ID -H "X-Token: $TOKEN"
-
-# Make a file public
-curl -X PUT http://0.0.0.0:5000/files/$IMAGE_ID/publish -H "X-Token: $TOKEN"
-
-# Make a file private
-curl -X PUT http://0.0.0.0:5000/files/$IMAGE_ID/unpublish -H "X-Token: $TOKEN"
-
-# Disconnect
+# 10. Se déconnecter
 curl -X GET http://0.0.0.0:5000/disconnect -H "X-Token: $TOKEN"
 ```
 
-## API Endpoints
+## Complete Testing Guide
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/users` | Create a user |
-| GET | `/connect` | Connect (returns a token) |
-| GET | `/disconnect` | Disconnect |
-| GET | `/users/me` | Get connected user |
-| POST | `/files` | Create a file/folder |
-| GET | `/files/:id` | Get file information |
-| GET | `/files` | List all files |
-| PUT | `/files/:id/publish` | Make a file public |
-| PUT | `/files/:id/unpublish` | Make a file private |
-| GET | `/files/:id/data` | Download a file |
-| GET | `/files/:id/data?size=100` | Download 100px thumbnail |
-| GET | `/files/:id/data?size=250` | Download 250px thumbnail |
-| GET | `/files/:id/data?size=500` | Download 500px thumbnail |
-
-## Project Structure
-
-```
-.
-├── controllers/
-│   ├── AppController.js      # Status, stats
-│   ├── AuthController.js     # Authentication
-│   ├── FilesController.js    # File management
-│   └── UsersController.js    # User management
-├── routes/
-│   └── index.js              # API routes
-├── utils/
-│   ├── db.mjs                # MongoDB client
-│   └── redis.mjs             # Redis client
-├── server.js                 # Express server
-├── worker.js                 # Bull worker for thumbnails
-├── image_upload.py           # Python upload script
-├── venv/                     # Python virtual environment
-└── package.json
-```
-
-## Environment Variables
-
-You can configure the project with environment variables:
-
-```bash
-export DB_HOST=localhost
-export DB_PORT=27017
-export DB_DATABASE=files_manager
-export FOLDER_PATH=/tmp/files_manager
-```
-
-## Troubleshooting
-
-### MongoDB won't start
-
-```bash
-# Check logs
-tail -f /var/log/mongodb/mongod.log
-
-# Create data directory
-mkdir -p /data/db
-mongod --dbpath /data/db
-```
-
-### Redis won't start
-
-```bash
-# Check logs
-redis-cli
-> PING
-
-# Restart Redis
-redis-cli shutdown
-redis-server &
-```
-
-### Thumbnails are not generated
-
-```bash
-# Check if worker is running
-ps aux | grep worker
-
-# Check worker logs
-# Errors will appear in the terminal where you launched npm run start-worker
-
-# Restart worker
-# Ctrl+C in the worker terminal
-npm run start-worker
-```
-
-### "PayloadTooLargeError" error
-
-The server has a size limit for uploads. For large images, you need to increase the limit in `server.js`.
-
-### Python script issues
-
-If `image_upload.py` doesn't work:
-
-```bash
-# Make sure virtual environment is activated
-source venv/bin/activate
-
-# Verify requests module is installed
-pip list | grep requests
-
-# If not installed
-pip install requests
-```
-
-## Authors
-
-Project completed as part of the Holberton School curriculum.
-
-## License
-
-ISC
