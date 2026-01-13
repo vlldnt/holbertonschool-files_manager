@@ -129,18 +129,19 @@ npm run start-worker
 
 ## Individual cURL Tests
 
-Tests individuels - chaque commande capture automatiquement les variables (TOKEN, IDs):
-
 ### 1. GET /status
 ```bash
 curl -sS http://0.0.0.0:5000/status  | jq
 ```
-***Should be:*** `{"redis":true,"db":true}`
+![step1](https://raw.githubusercontent.com/vlldnt/holbertonschool-files_manager/main/readme_images/1.png)
+
+
 
 ### 2. GET /stats
 ```bash
 curl -sS http://0.0.0.0:5000/stats | jq
 ```
+![step2](https://raw.githubusercontent.com/vlldnt/holbertonschool-files_manager/main/readme_images/2.png)
 
 ### 3. POST /users (crée un utilisateur)
 ```bash
@@ -151,16 +152,21 @@ curl -sS -X POST 0.0.0.0:5000/users \
   -H "Content-Type: application/json" \
   -d "{ \"email\": \"$EMAIL\", \"password\": \"$PASSWORD\" }" | jq
 ```
+![step3](https://raw.githubusercontent.com/vlldnt/holbertonschool-files_manager/main/readme_images/3.png)
+or
+![step3.1](https://raw.githubusercontent.com/vlldnt/holbertonschool-files_manager/main/readme_images/3-1.png)
 
 ### 4. GET /connect (capture automatiquement le TOKEN)
 ```bash
 export TOKEN=$(curl -sS http://0.0.0.0:5000/connect -H "Authorization: Basic $(echo -n "$EMAIL:$PASSWORD" | base64)" | jq -r '.token') && echo $TOKEN
 ```
+![step4](https://raw.githubusercontent.com/vlldnt/holbertonschool-files_manager/main/readme_images/4.png)
 
 ### 5. GET /users/me
 ```bash
 curl -sS http://0.0.0.0:5000/users/me -H "X-Token: $TOKEN" | jq
 ```
+![step5](https://raw.githubusercontent.com/vlldnt/holbertonschool-files_manager/main/readme_images/5.png)
 
 ### 6. POST /files (créer un dossier, capture FOLDER_ID)
 ```bash
