@@ -131,6 +131,7 @@ npm run start-worker
 ### Step 1: Create a user
 
 ```bash
+# Create a new user (only needed once)
 curl -X POST http://0.0.0.0:5000/users \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com", "password": "password123"}'
@@ -144,106 +145,73 @@ curl -X POST http://0.0.0.0:5000/users \
 }
 ```
 
-### Step 2: Connect
+### Step 2: Connect and save token (automatique)
 
+Interactive (recommended):
 ```bash
-# Encode your credentials in base64
-echo -n "test@example.com:password123" | base64
-# Result: dGVzdEBleGFtcGxlLmNvbTpwYXNzd29yZDEyMw==
+# Saisir email et mot de passe (ne s'affichent pas à l'écran)
+read -p "Email: " EMAIL
+read -sp "Password: " PASSWORD
+echo
 
-# Connect
-curl -X GET http://0.0.0.0:5000/connect \
-  -H "Authorization: Basic dGVzdEBleGFtcGxlLmNvbTpwYXNzd29yZDEyMw=="
+# Encodage automatique en base64 et récupération du token
+BASIC=$(printf "%s:%s" "$EMAIL" "$PASSWORD" | base64)
+export TOKEN=$(curl -s -X GET http://0.0.0.0:5000/connect \
+  -H "Authorization: Basic $BASIC" | jq -r '.token')
+
+echo "TOKEN set: ${TOKEN:+(hidden)}"
 ```
 
-**Response:**
-```json
-{
-  "token": "YOUR_TOKEN_HERE"
-}
+Non-interactive (pré-définir EMAIL et PASSWORD):
+```bash
+# export EMAIL="test@example.com"
+# export PASSWORD="password123"
+BASIC=$(printf "%s:%s" "$EMAIL" "$PASSWORD" | base64)
+export TOKEN=$(curl -s -X GET http://0.0.0.0:5000/connect \
+  -H "Authorization: Basic $BASIC" | jq -r '.token')
+echo "TOKEN set"
 ```
 
-**⚠️ Important:** Save your TOKEN, you'll need it for all subsequent requests!
+### Step 3: Create a folder (automatique)
 
 ```bash
-# Set token as environment variable
-export TOKEN="YOUR_TOKEN_HERE"
-```
-
-### Step 3: Create a folder
-
-```bash
-curl -X POST http://0.0.0.0:5000/files \
+export FOLDER_ID=$(curl -s -X POST http://0.0.0.0:5000/files \
   -H "X-Token: $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name": "my_photos", "type": "folder"}'
+  -d '{"name":"my_photos","type":"folder"}' | jq -r '.id')
+
+echo "FOLDER_ID=$FOLDER_ID"
 ```
 
-**Response:**
-```json
-{
-  "id": "FOLDER_ID",
-  "userId": "USER_ID",
-  "name": "my_photos",
-  "type": "folder",
-  "isPublic": false,
-  "parentId": 0
-}
-```
+### Step 4: Upload an image (automatique)
 
-**⚠️ Important:** Save the FOLDER_ID!
-
+Option A: With Python script (prints response; capture ID)
 ```bash
-export FOLDER_ID="FOLDER_ID"
-```
-
-### Step 4: Upload an image
-
-#### Option A: With Python script (Recommended)
-
-```bash
-# Activate virtual environment first
+# Activate venv first
 source venv/bin/activate
 
-# Create a test image
+# Create a test image (1x1 PNG)
 echo 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==' | base64 -d > test_image.png
 
-# Upload the image
-python3 image_upload.py test_image.png $TOKEN $FOLDER_ID
+# Upload and capture IMAGE_ID
+IMAGE_RESPONSE=$(python3 image_upload.py test_image.png "$TOKEN" "$FOLDER_ID")
+export IMAGE_ID=$(echo "$IMAGE_RESPONSE" | jq -r '.id')
+echo "IMAGE_ID=$IMAGE_ID"
 ```
 
-#### Option B: With curl
-
+Option B: With curl (automatique)
 ```bash
 # Create a test image
 echo 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==' | base64 -d > test_image.png
 
-# Encode in base64
+# Encode and upload, puis enregistrer l'ID
 IMAGE_DATA=$(base64 -w 0 test_image.png)
-
-# Upload
-curl -X POST http://0.0.0.0:5000/files \
+export IMAGE_ID=$(curl -s -X POST http://0.0.0.0:5000/files \
   -H "X-Token: $TOKEN" \
   -H "Content-Type: application/json" \
-  -d "{\"name\": \"my_photo.png\", \"type\": \"image\", \"isPublic\": true, \"data\": \"$IMAGE_DATA\", \"parentId\": \"$FOLDER_ID\"}"
-```
+  -d "{\"name\":\"my_photo.png\",\"type\":\"image\",\"isPublic\":true,\"data\":\"$IMAGE_DATA\",\"parentId\":\"$FOLDER_ID\"}" | jq -r '.id')
 
-**Response:**
-```json
-{
-  "id": "IMAGE_ID",
-  "userId": "USER_ID",
-  "name": "my_photo.png",
-  "type": "image",
-  "isPublic": true,
-  "parentId": "FOLDER_ID"
-}
-```
-
-**⚠️ Important:** Save the IMAGE_ID!
-
-```bash
-export IMAGE_ID="IMAGE_ID"
+echo "IMAGE_ID=$IMAGE_ID"
 ```
 
 ### Step 5: Wait for thumbnail generation
@@ -264,27 +232,16 @@ You should see 4 files:
 -rw-r--r-- 1 root root  98 Jan 13 13:06 UUID_100
 ```
 
-### Step 6: Download files
+## Other operations
+
+Examples below use $TOKEN, $FOLDER_ID, $IMAGE_ID (pas besoin de copier/coller) :
 
 ```bash
-# Download original image
+# List files
+curl -X GET http://0.0.0.0:5000/files -H "X-Token: $TOKEN"
+
+# Download original
 curl -XGET http://0.0.0.0:5000/files/$IMAGE_ID/data -o original.png
-file original.png
-
-# Download 100px thumbnail
-curl -XGET "http://0.0.0.0:5000/files/$IMAGE_ID/data?size=100" -o thumbnail_100.png
-file thumbnail_100.png
-
-# Download 250px thumbnail
-curl -XGET "http://0.0.0.0:5000/files/$IMAGE_ID/data?size=250" -o thumbnail_250.png
-file thumbnail_250.png
-
-# Download 500px thumbnail
-curl -XGET "http://0.0.0.0:5000/files/$IMAGE_ID/data?size=500" -o thumbnail_500.png
-file thumbnail_500.png
-
-# View all downloaded files
-ls -lh original.png thumbnail_*.png
 ```
 
 **Expected result:**
