@@ -137,7 +137,7 @@ Le testeur reçoit déjà l'en-tête Basic. Récupérez le token directement ave
 export TOKEN=$(curl -s -X GET http://0.0.0.0:5000/connect \
   -H "Authorization: Basic Ym9iQGR5bGFuLmNvbTp0b3RvMTIzNCE=" | jq -r '.token')
 
-echo "TOKEN set: ${TOKEN:+(hidden)}"
+echo "Your token: $TOKEN"
 ```
 
 ### Step 3: Create a folder (automatique)
