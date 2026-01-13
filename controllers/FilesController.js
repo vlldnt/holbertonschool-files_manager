@@ -1,4 +1,5 @@
 import mime from 'mime-types';
+import Queue from 'bull';
 import { ObjectId } from 'mongodb';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { v4 as uuidv4 } from 'uuid';
@@ -7,6 +8,7 @@ import redisClient from '../utils/redis';
 import dbClient from '../utils/db';
 
 const FOLDER_PATH = process.env.FOLDER_PATH || '/tmp/files_manager';
+const fileQueue = new Queue('fileQueue');
 
 class FilesController {
   static async postUpload(req, res) {
@@ -87,6 +89,8 @@ class FilesController {
     newFile.localPath = localPath;
 
     const result = await dbClient.db.collection('files').insertOne(newFile);
+
+    await fileQueue.add({ userId, fileId: result.insertedId.toString() });
 
     return res.status(201).json({
       id: result.insertedId,
@@ -249,6 +253,8 @@ class FilesController {
 
   static async getFile(req, res) {
     const fileId = req.params.id;
+    const { size } = req.query;
+
     const file = await dbClient.db
       .collection('files')
       .findOne({ _id: new ObjectId(fileId) });
@@ -277,7 +283,12 @@ class FilesController {
       return res.status(404).json({ error: 'Not found' });
     }
 
-    const absolutePath = path.resolve(file.localPath);
+    let filePath = file.localPath;
+    if (size && ['100', '250', '500'].includes(size)) {
+      filePath = `${file.localPath}_${size}`;
+    }
+
+    const absolutePath = path.resolve(filePath);
     if (!existsSync(absolutePath)) {
       return res.status(404).json({ error: 'Not found' });
     }
