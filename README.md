@@ -128,48 +128,16 @@ npm run start-worker
 
 ## Complete Testing Guide
 
-### Step 1: Create a user
+### Step 2: Connect and save token (direct)
+
+Le testeur reçoit déjà l'en-tête Basic. Récupérez le token directement avec cette commande :
 
 ```bash
-# Create a new user (only needed once)
-curl -X POST http://0.0.0.0:5000/users \
-  -H "Content-Type: application/json" \
-  -d '{"email": "test@example.com", "password": "password123"}'
-```
-
-**Response:**
-```json
-{
-  "id": "USER_ID",
-  "email": "test@example.com"
-}
-```
-
-### Step 2: Connect and save token (automatique)
-
-Interactive (recommended):
-```bash
-# Saisir email et mot de passe (ne s'affichent pas à l'écran)
-read -p "Email: " EMAIL
-read -sp "Password: " PASSWORD
-echo
-
-# Encodage automatique en base64 et récupération du token
-BASIC=$(printf "%s:%s" "$EMAIL" "$PASSWORD" | base64)
+# Récupère et exporte le token directement (header fourni)
 export TOKEN=$(curl -s -X GET http://0.0.0.0:5000/connect \
-  -H "Authorization: Basic $BASIC" | jq -r '.token')
+  -H "Authorization: Basic Ym9iQGR5bGFuLmNvbTp0b3RvMTIzNCE=" | jq -r '.token')
 
 echo "TOKEN set: ${TOKEN:+(hidden)}"
-```
-
-Non-interactive (pré-définir EMAIL et PASSWORD):
-```bash
-# export EMAIL="test@example.com"
-# export PASSWORD="password123"
-BASIC=$(printf "%s:%s" "$EMAIL" "$PASSWORD" | base64)
-export TOKEN=$(curl -s -X GET http://0.0.0.0:5000/connect \
-  -H "Authorization: Basic $BASIC" | jq -r '.token')
-echo "TOKEN set"
 ```
 
 ### Step 3: Create a folder (automatique)
