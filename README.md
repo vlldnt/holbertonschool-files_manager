@@ -133,15 +133,12 @@ npm run start-worker
 ```bash
 curl -sS http://0.0.0.0:5000/status  | jq
 ```
-![step1](https://raw.githubusercontent.com/vlldnt/holbertonschool-files_manager/main/readme_images/1.png)
-
 
 
 ### 2. GET /stats
 ```bash
 curl -sS http://0.0.0.0:5000/stats | jq
 ```
-![step2](https://raw.githubusercontent.com/vlldnt/holbertonschool-files_manager/main/readme_images/2.png)
 
 ### 3. POST /users (crée un utilisateur)
 ```bash
@@ -152,21 +149,17 @@ curl -sS -X POST 0.0.0.0:5000/users \
   -H "Content-Type: application/json" \
   -d "{ \"email\": \"$EMAIL\", \"password\": \"$PASSWORD\" }" | jq
 ```
-![step3](https://raw.githubusercontent.com/vlldnt/holbertonschool-files_manager/main/readme_images/3.png)
-or
-![step3.1](https://raw.githubusercontent.com/vlldnt/holbertonschool-files_manager/main/readme_images/3-1.png)
+
 
 ### 4. GET /connect (capture automatiquement le TOKEN)
 ```bash
 export TOKEN=$(curl -sS http://0.0.0.0:5000/connect -H "Authorization: Basic $(echo -n "$EMAIL:$PASSWORD" | base64)" | jq -r '.token') && echo $TOKEN
 ```
-![step4](https://raw.githubusercontent.com/vlldnt/holbertonschool-files_manager/main/readme_images/4.png)
 
 ### 5. GET /users/me
 ```bash
 curl -sS http://0.0.0.0:5000/users/me -H "X-Token: $TOKEN" | jq
 ```
-![step5](https://raw.githubusercontent.com/vlldnt/holbertonschool-files_manager/main/readme_images/5.png)
 
 ### 6. POST /files (créer un dossier, capture FOLDER_ID)
 ```bash
@@ -200,84 +193,37 @@ echo "IMAGE_ID: $IMAGE_ID"
 
 ### 9. GET /files/:id
 ```bash
-curl http://0.0.0.0:5000/files/$FILE_ID -H "X-Token: $TOKEN"
+curl -sS http://0.0.0.0:5000/files/$FILE_ID -H "X-Token: $TOKEN" | jq
 ```
 
 ### 10. GET /files (pagination)
 ```bash
-curl "http://0.0.0.0:5000/files?parentId=0&page=0" -H "X-Token: $TOKEN"
+curl -sS "http://0.0.0.0:5000/files?parentId=0&page=0" -H "X-Token: $TOKEN" | jq
 ```
 
 ### 11. PUT /files/:id/publish
 ```bash
-curl -X PUT http://0.0.0.0:5000/files/$FILE_ID/publish -H "X-Token: $TOKEN"
+curl -sS -X PUT http://0.0.0.0:5000/files/$FILE_ID/publish -H "X-Token: $TOKEN" | jq
 ```
 
 ### 12. PUT /files/:id/unpublish
 ```bash
-curl -X PUT http://0.0.0.0:5000/files/$FILE_ID/unpublish -H "X-Token: $TOKEN"
+curl -sS -X PUT http://0.0.0.0:5000/files/$FILE_ID/unpublish -H "X-Token: $TOKEN" | jq
 ```
 
 ### 13. GET /files/:id/data (fichier original)
 ```bash
-curl http://0.0.0.0:5000/files/$FILE_ID/data
+curl -sS http://0.0.0.0:5000/files/$FILE_ID/data
 ```
 
 ### 14. GET /files/:id/data (thumbnails pour image)
 ```bash
-curl "http://0.0.0.0:5000/files/$IMAGE_ID/data?size=100" -o thumb_100.png
-curl "http://0.0.0.0:5000/files/$IMAGE_ID/data?size=250" -o thumb_250.png
-curl "http://0.0.0.0:5000/files/$IMAGE_ID/data?size=500" -o thumb_500.png
+curl -sS "http://0.0.0.0:5000/files/$IMAGE_ID/data?size=100" -o thumb_100.png
+curl -sS "http://0.0.0.0:5000/files/$IMAGE_ID/data?size=250" -o thumb_250.png
+curl -sS "http://0.0.0.0:5000/files/$IMAGE_ID/data?size=500" -o thumb_500.png
 ```
 
 ### 15. GET /disconnect
 ```bash
-curl http://0.0.0.0:5000/disconnect -H "X-Token: $TOKEN"
+curl -sS http://0.0.0.0:5000/disconnect -H "X-Token: $TOKEN"
 ```
-
-### Workflow complet d'exemple
-
-```bash
-# 1. Vérifier le status
-curl -sS http://0.0.0.0:5000/status | jq
-
-# 2. Créer un utilisateur
-curl -sS -X POST http://0.0.0.0:5000/users -H "Content-Type: application/json" -d '{"email":"testeur@test.com","password":"123456mdp!"}' | jq
-
-# 3. Se connecter et récupérer le token
-TOKEN=$(curl -sS -X GET http://0.0.0.0:5000/connect -H "Authorization: Basic $(echo -n 'testeur@test.com:123456mdp!' | base64)" | jq -r '.token') && echo "Token: $TOKEN"
-
-# 4. Vérifier l'utilisateur connecté
-curl -sS http://0.0.0.0:5000/users/me -H "X-Token: $TOKEN" | jq
-
-# 5. Créer un dossier
-FOLDER_ID=$(curl -X POST http://0.0.0.0:5000/files \
-  -H "X-Token: $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"MyFolder","type":"folder"}' \
-  | jq -r '.id')
-echo "Folder ID: $FOLDER_ID"
-
-# 6. Upload un fichier dans le dossier
-FILE_ID=$(curl -X POST http://0.0.0.0:5000/files \
-  -H "X-Token: $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "{\"name\":\"test.txt\",\"type\":\"file\",\"data\":\"$(echo -n 'Hello World!' | base64)\",\"parentId\":\"$FOLDER_ID\"}" \
-  | jq -r '.id')
-echo "File ID: $FILE_ID"
-
-# 7. Lister les fichiers
-curl "http://0.0.0.0:5000/files?parentId=$FOLDER_ID" -H "X-Token: $TOKEN"
-
-# 8. Publier le fichier
-curl -X PUT "http://0.0.0.0:5000/files/$FILE_ID/publish" -H "X-Token: $TOKEN"
-
-# 9. Récupérer le contenu
-curl "http://0.0.0.0:5000/files/$FILE_ID/data"
-
-# 10. Se déconnecter
-curl -X GET http://0.0.0.0:5000/disconnect -H "X-Token: $TOKEN"
-```
-
-## Complete Testing Guide
-
