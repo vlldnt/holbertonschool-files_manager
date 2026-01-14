@@ -1,7 +1,11 @@
 import crypto from 'crypto';
+import Queue from 'bull';
 import { ObjectId } from 'mongodb';
 import dbClient from '../utils/db';
 import redisClient from '../utils/redis';
+
+const userQueue = new Queue('userQueue');
+
 
 class UsersController {
   static async postNew(req, res) {
@@ -27,6 +31,8 @@ class UsersController {
 
     const newUser = { email, password: hashedPWD };
     const result = await dbClient.db.collection('users').insertOne(newUser);
+
+    await userQueue.add({ userId: result.insertedId });
 
     return res.status(201).json({ id: result.insertedId, email });
   }
