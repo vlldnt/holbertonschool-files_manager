@@ -3,7 +3,8 @@
 A file management system with authentication, storage, and automatic thumbnail generation for images.
 
 ## Commnands for tests
-To test all tests.js```
+To test all tests.js
+```
 npm run test tests/all.test.js
 ```
 
