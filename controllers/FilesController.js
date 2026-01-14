@@ -288,6 +288,16 @@ class FilesController {
       return res.status(404).json({ error: 'Not found' });
     }
 
+    // Validate size parameter if provided
+    if (size) {
+      if (!['100', '250', '500'].includes(size)) {
+        return res.status(400).json({ error: 'Invalid size parameter' });
+      }
+      if (file.type !== 'image') {
+        return res.status(400).json({ error: 'Invalid request' });
+      }
+    }
+
     let filePath = file.localPath;
     if (size && ['100', '250', '500'].includes(size)) {
       filePath = `${file.localPath}_${size}`;
