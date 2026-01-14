@@ -6,7 +6,6 @@ import redisClient from '../utils/redis';
 
 const userQueue = new Queue('userQueue');
 
-
 class UsersController {
   static async postNew(req, res) {
     const { email, password } = req.body;
