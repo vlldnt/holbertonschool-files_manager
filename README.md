@@ -211,7 +211,7 @@ npm run start-worker
 
 ### 10. Run the tests
 ```bash
-npm test
+npm run test tests/all.test.js
 ```
 
 ## Architecture
